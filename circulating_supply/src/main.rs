@@ -22,10 +22,14 @@ const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
 
 const AGGREGATED: &str = "aggregated";
 
-fn main(
-    pool: explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
-    indexer: &Indexer,
-) {
+fn main(indexer: &Indexer) {
+    dotenv::dotenv().ok();
+
+    let pool = models::establish_connection(
+        &std::env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set in either .env or environment "),
+    );
+
     let view_client = indexer.client_actors().0;
     if indexer.near_config().genesis.config.chain_id == "mainnet" {
         actix::spawn(run_circulating_supply_computation(view_client, pool));

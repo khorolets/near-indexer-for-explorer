@@ -10,6 +10,7 @@ actix = "0.13.0"
 anyhow = "1.0.51"
 bigdecimal = "=0.1.0"
 chrono = "0.4.19"
+dotenv = "0.15.0"
 # syn version conflict, replace with crates.io version once released
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev="03487c184d37b0382dd9bd41c57466acad58fc1f" }
 tokio = { version = "1.1", features = ["sync", "time"] }

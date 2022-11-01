@@ -841,6 +841,7 @@ dependencies = [
  "anyhow",
  "bigdecimal",
  "chrono",
+ "dotenv",
  "explorer-database",
  "near-lake-framework",
  "near-sdk",
