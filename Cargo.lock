@@ -843,6 +843,8 @@ dependencies = [
  "chrono",
  "dotenv",
  "explorer-database",
+ "near-jsonrpc-client",
+ "near-jsonrpc-primitives",
  "near-lake-framework",
  "near-sdk",
  "tokio",

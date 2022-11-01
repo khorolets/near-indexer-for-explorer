@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use actix::Addr;
 use anyhow::Context;
 
-use near_client::{Query, ViewClientActor};
+use near_jsonrpc_client::{methods, JsonRpcClient};
+use near_jsonrpc_primitives::types::query::QueryResponseKind;
 use near_lake_framework::near_indexer_primitives;
 use near_sdk::borsh::BorshDeserialize;
 use near_sdk::json_types::{U128, U64};
@@ -17,7 +17,7 @@ use super::lockup_types::{
 pub(super) const TRANSFERS_ENABLED: Duration = Duration::from_nanos(1602614338293769340);
 
 pub(super) async fn get_lockup_contract_state(
-    view_client: &Addr<ViewClientActor>,
+    rpc_client: &JsonRpcClient,
     account_id: &near_indexer_primitives::types::AccountId,
     block_height: &near_indexer_primitives::types::BlockHeight,
 ) -> anyhow::Result<LockupContract> {
@@ -27,28 +27,21 @@ pub(super) async fn get_lockup_contract_state(
     let request = near_indexer_primitives::views::QueryRequest::ViewState {
         account_id: account_id.clone(),
         prefix: vec![].into(),
-        include_proof: false,
     };
-    let query = Query::new(block_reference, request);
+    let query = methods::query::RpcQueryRequest {
+        block_reference,
+        request,
+    };
 
-    let state_response = view_client
-        .send(query)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to deliver ViewState for lockup contract {}, block_height {}",
-                account_id, block_height
-            )
-        })?
-        .with_context(|| {
-            format!(
-                "Invalid ViewState query for lockup contract {}, block_height {}",
-                account_id, block_height
-            )
-        })?;
+    let state_response = rpc_client.call(query).await.with_context(|| {
+        format!(
+            "Failed to deliver ViewState for lockup contract {}, block_height {}",
+            account_id, block_height
+        )
+    })?;
 
     let view_state_result = match state_response.kind {
-        near_indexer_primitives::views::QueryResponseKind::ViewState(x) => x,
+        QueryResponseKind::ViewState(state) => state,
         _ => {
             anyhow::bail!(
                 "Failed to extract ViewState response for lockup contract {}, block_height {}",
@@ -64,7 +57,7 @@ pub(super) async fn get_lockup_contract_state(
         )
     })?;
 
-    let mut state = LockupContract::try_from_slice(&view_state.value)
+    let mut state = LockupContract::try_from_slice(&view_state.value.clone().into_bytes())
         .with_context(|| format!("Failed to construct LockupContract for {}", account_id))?;
 
     // If owner of the lockup account didn't call the

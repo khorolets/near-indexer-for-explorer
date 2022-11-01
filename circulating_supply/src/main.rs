@@ -2,13 +2,12 @@ use std::ops::{Add, Sub};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
-use actix::Addr;
 use anyhow::Context;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use tracing::{error, info, warn};
 
-use near_indexer::Indexer;
+use near_jsonrpc_client::{methods, JsonRpcClient};
 use near_lake_framework::near_indexer_primitives;
 
 use explorer_database::{adapters, models};
@@ -22,7 +21,7 @@ const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
 
 const AGGREGATED: &str = "aggregated";
 
-fn main(indexer: &Indexer) {
+fn main() {
     dotenv::dotenv().ok();
 
     let pool = models::establish_connection(
@@ -30,10 +29,9 @@ fn main(indexer: &Indexer) {
             .expect("DATABASE_URL must be set in either .env or environment "),
     );
 
-    let view_client = indexer.client_actors().0;
-    if indexer.near_config().genesis.config.chain_id == "mainnet" {
-        actix::spawn(run_circulating_supply_computation(view_client, pool));
-    }
+    let rpc_client = JsonRpcClient::connect("https://rpc.mainnet.near.org");
+
+    actix::spawn(run_circulating_supply_computation(rpc_client, pool));
 }
 
 // Compute circulating supply on a daily basis, starting from 13 Oct 2020
@@ -42,7 +40,7 @@ fn main(indexer: &Indexer) {
 // total_supply - sum(locked_tokens_on_each_lockup) - sum(locked_foundation_account)
 // The value is always computed for the last block in a day (UTC).
 pub async fn run_circulating_supply_computation(
-    view_client: Addr<near_client::ViewClientActor>,
+    rpc_client: JsonRpcClient,
     pool: explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
 ) {
     // We perform actual computations 00:10 UTC each day to be sure that the data is finalized
@@ -62,9 +60,9 @@ pub async fn run_circulating_supply_computation(
             tokio::time::sleep_until(tokio::time::Instant::now().add(day_to_compute.sub(now)))
                 .await;
         }
-        wait_for_loading_needed_blocks(&view_client, &day_to_compute).await;
+        wait_for_loading_needed_blocks(&rpc_client, &day_to_compute).await;
 
-        match check_and_collect_daily_circulating_supply(&view_client, &pool, &day_to_compute).await
+        match check_and_collect_daily_circulating_supply(&rpc_client, &pool, &day_to_compute).await
         {
             Ok(_) => {
                 day_to_compute = day_to_compute.add(DAY);
@@ -84,7 +82,7 @@ pub async fn run_circulating_supply_computation(
 }
 
 async fn check_and_collect_daily_circulating_supply(
-    view_client: &Addr<near_client::ViewClientActor>,
+    rpc_client: &JsonRpcClient,
     pool: &explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
     request_datetime: &Duration,
 ) -> anyhow::Result<Option<models::aggregated::circulating_supply::CirculatingSupply>> {
@@ -111,7 +109,7 @@ async fn check_and_collect_daily_circulating_supply(
                 printable_date,
                 block_timestamp
             );
-            let supply = compute_circulating_supply_for_block(pool, view_client, &block).await?;
+            let supply = compute_circulating_supply_for_block(pool, rpc_client, &block).await?;
             adapters::aggregated::circulating_supply::add_circulating_supply(pool, &supply).await;
             info!(
                 target: crate::AGGREGATED,
@@ -138,7 +136,7 @@ async fn check_and_collect_daily_circulating_supply(
 
 async fn compute_circulating_supply_for_block(
     pool: &explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
-    view_client: &Addr<near_client::ViewClientActor>,
+    rpc_client: &JsonRpcClient,
     block: &models::Block,
 ) -> anyhow::Result<models::aggregated::circulating_supply::CirculatingSupply> {
     let block_timestamp = block
@@ -162,17 +160,16 @@ async fn compute_circulating_supply_for_block(
     let mut unfinished_lockup_contracts_count: i32 = 0;
 
     for lockup_account_id in &lockup_account_ids {
-        let state =
-            lockup::get_lockup_contract_state(view_client, lockup_account_id, &block_height)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to get lockup contract details for {}",
-                        lockup_account_id
-                    )
-                })?;
+        let state = lockup::get_lockup_contract_state(rpc_client, lockup_account_id, &block_height)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to get lockup contract details for {}",
+                    lockup_account_id
+                )
+            })?;
         let code_hash =
-            account_details::get_contract_code_hash(view_client, lockup_account_id, &block_height)
+            account_details::get_contract_code_hash(rpc_client, lockup_account_id, &block_height)
                 .await?;
         let is_lockup_with_bug = lockup::is_bug_inside_contract(&code_hash, lockup_account_id)?;
         let locked_amount = state
@@ -194,7 +191,7 @@ async fn compute_circulating_supply_for_block(
     let mut foundation_locked_tokens: u128 = 0;
     for account_id in &foundation_locked_account_ids {
         foundation_locked_tokens +=
-            account_details::get_account_balance(view_client, account_id, &block_height).await?;
+            account_details::get_account_balance(rpc_client, account_id, &block_height).await?;
     }
 
     let circulating_supply: u128 = total_supply - foundation_locked_tokens - lockups_locked_tokens;
@@ -215,12 +212,9 @@ async fn compute_circulating_supply_for_block(
     })
 }
 
-async fn wait_for_loading_needed_blocks(
-    view_client: &Addr<near_client::ViewClientActor>,
-    day_to_compute: &Duration,
-) {
+async fn wait_for_loading_needed_blocks(rpc_client: &JsonRpcClient, day_to_compute: &Duration) {
     loop {
-        match get_final_block_timestamp(view_client).await {
+        match get_final_block_timestamp(rpc_client).await {
             Ok(timestamp) => {
                 if timestamp > *day_to_compute {
                     return;
@@ -245,19 +239,16 @@ async fn wait_for_loading_needed_blocks(
     }
 }
 
-async fn get_final_block_timestamp(
-    view_client: &Addr<near_client::ViewClientActor>,
-) -> anyhow::Result<Duration> {
+async fn get_final_block_timestamp(rpc_client: &JsonRpcClient) -> anyhow::Result<Duration> {
     let block_reference = near_indexer_primitives::types::BlockReference::Finality(
         near_indexer_primitives::types::Finality::Final,
     );
-    let query = near_client::GetBlock(block_reference);
+    let query = methods::block::RpcBlockRequest { block_reference };
 
-    let block_response = view_client
-        .send(query)
+    let block_response = rpc_client
+        .call(query)
         .await
-        .context("Failed to deliver response")?
-        .context("Invalid request")?;
+        .context("Failed to deliver response")?;
 
     Ok(Duration::from_nanos(block_response.header.timestamp))
 }
