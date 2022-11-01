@@ -4,7 +4,7 @@ use actix::Addr;
 use anyhow::Context;
 
 use near_client::{Query, ViewClientActor};
-use near_indexer::near_primitives;
+use near_lake_framework::near_indexer_primitives;
 use near_sdk::borsh::BorshDeserialize;
 use near_sdk::json_types::{U128, U64};
 
@@ -18,13 +18,13 @@ pub(super) const TRANSFERS_ENABLED: Duration = Duration::from_nanos(160261433829
 
 pub(super) async fn get_lockup_contract_state(
     view_client: &Addr<ViewClientActor>,
-    account_id: &near_primitives::types::AccountId,
-    block_height: &near_primitives::types::BlockHeight,
+    account_id: &near_indexer_primitives::types::AccountId,
+    block_height: &near_indexer_primitives::types::BlockHeight,
 ) -> anyhow::Result<LockupContract> {
-    let block_reference = near_primitives::types::BlockReference::BlockId(
-        near_primitives::types::BlockId::Height(*block_height),
+    let block_reference = near_indexer_primitives::types::BlockReference::BlockId(
+        near_indexer_primitives::types::BlockId::Height(*block_height),
     );
-    let request = near_primitives::views::QueryRequest::ViewState {
+    let request = near_indexer_primitives::views::QueryRequest::ViewState {
         account_id: account_id.clone(),
         prefix: vec![].into(),
         include_proof: false,
@@ -48,7 +48,7 @@ pub(super) async fn get_lockup_contract_state(
         })?;
 
     let view_state_result = match state_response.kind {
-        near_primitives::views::QueryResponseKind::ViewState(x) => x,
+        near_indexer_primitives::views::QueryResponseKind::ViewState(x) => x,
         _ => {
             anyhow::bail!(
                 "Failed to extract ViewState response for lockup contract {}, block_height {}",
@@ -81,8 +81,8 @@ pub(super) async fn get_lockup_contract_state(
 // https://github.com/near/core-contracts/pull/136
 // For each contract, we should choose the logic based on the binary version of the contract
 pub(super) fn is_bug_inside_contract(
-    code_hash: &near_primitives::hash::CryptoHash,
-    account_id: &near_primitives::types::AccountId,
+    code_hash: &near_indexer_primitives::CryptoHash,
+    account_id: &near_indexer_primitives::types::AccountId,
 ) -> anyhow::Result<bool> {
     match &*code_hash.to_string() {
         // The first implementation, with the bug

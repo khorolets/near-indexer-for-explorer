@@ -842,6 +842,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "explorer-database",
+ "near-lake-framework",
  "near-sdk",
  "tokio",
  "tracing",

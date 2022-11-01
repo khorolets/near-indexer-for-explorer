@@ -17,4 +17,6 @@ tracing = "0.1.13"
 tracing-subscriber = "0.2.4"
 uint = { version = "0.8.3", default-features = false }
 
+near-lake-framework = "0.5.2"
+
 explorer-database = { path = '../database' }

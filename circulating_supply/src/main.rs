@@ -8,8 +8,8 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use tracing::{error, info, warn};
 
-use near_indexer::near_primitives;
 use near_indexer::Indexer;
+use near_lake_framework::near_indexer_primitives;
 
 use explorer_database::{adapters, models};
 
@@ -181,10 +181,10 @@ async fn compute_circulating_supply_for_block(
     }
 
     // The list is taken from the conversation with Yessin
-    let foundation_locked_account_ids: [near_primitives::types::AccountId; 2] = [
-        near_primitives::types::AccountId::from_str("lockup.near")
+    let foundation_locked_account_ids: [near_indexer_primitives::types::AccountId; 2] = [
+        near_indexer_primitives::types::AccountId::from_str("lockup.near")
             .expect("lockup.near expected to be a valid AccountId"),
-        near_primitives::types::AccountId::from_str("contributors.near")
+        near_indexer_primitives::types::AccountId::from_str("contributors.near")
             .expect("contributors.near expected to be a valid AccountId"),
     ];
     let mut foundation_locked_tokens: u128 = 0;
@@ -244,8 +244,9 @@ async fn wait_for_loading_needed_blocks(
 async fn get_final_block_timestamp(
     view_client: &Addr<near_client::ViewClientActor>,
 ) -> anyhow::Result<Duration> {
-    let block_reference =
-        near_primitives::types::BlockReference::Finality(near_primitives::types::Finality::Final);
+    let block_reference = near_indexer_primitives::types::BlockReference::Finality(
+        near_indexer_primitives::types::Finality::Final,
+    );
     let query = near_client::GetBlock(block_reference);
 
     let block_response = view_client
