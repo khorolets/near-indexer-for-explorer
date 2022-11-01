@@ -836,6 +836,18 @@ dependencies = [
 [[package]]
 name = "circulating_supply"
 version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "bigdecimal",
+ "chrono",
+ "explorer-database",
+ "near-sdk",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uint 0.8.5",
+]
 
 [[package]]
 name = "clap"

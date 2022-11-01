@@ -3,26 +3,15 @@ use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 use actix::Addr;
-use actix_diesel::Database;
 use anyhow::Context;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
-use diesel::PgConnection;
 use tracing::{error, info, warn};
 
-use actix_diesel::Database;
-use diesel::PgConnection;
 use near_indexer::near_primitives;
 use near_indexer::Indexer;
 
-use crate::aggregated::{account_details, circulating_supply};
-use crate::db_adapters::accounts;
-use crate::db_adapters::aggregated::circulating_supply::{
-    add_circulating_supply, get_precomputed_circulating_supply_for_timestamp,
-};
-use crate::db_adapters::blocks;
-use crate::models;
-use crate::models::aggregated::circulating_supply::CirculatingSupply;
+use explorer_database::{adapters, models};
 
 mod account_details;
 mod lockup;
@@ -31,13 +20,15 @@ mod lockup_types;
 const DAY: Duration = Duration::from_secs(60 * 60 * 24);
 const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
 
-fn main(pool: Database<PgConnection>, indexer: &Indexer) {
+const AGGREGATED: &str = "aggregated";
+
+fn main(
+    pool: explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
+    indexer: &Indexer,
+) {
     let view_client = indexer.client_actors().0;
     if indexer.near_config().genesis.config.chain_id == "mainnet" {
-        actix::spawn(circulating_supply::run_circulating_supply_computation(
-            view_client,
-            pool,
-        ));
+        actix::spawn(run_circulating_supply_computation(view_client, pool));
     }
 }
 
@@ -46,9 +37,9 @@ fn main(pool: Database<PgConnection>, indexer: &Indexer) {
 // Circulating supply is calculated by the formula:
 // total_supply - sum(locked_tokens_on_each_lockup) - sum(locked_foundation_account)
 // The value is always computed for the last block in a day (UTC).
-pub(super) async fn run_circulating_supply_computation(
+pub async fn run_circulating_supply_computation(
     view_client: Addr<near_client::ViewClientActor>,
-    pool: Database<PgConnection>,
+    pool: explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
 ) {
     // We perform actual computations 00:10 UTC each day to be sure that the data is finalized
     let mut day_to_compute = lockup::TRANSFERS_ENABLED
@@ -90,19 +81,25 @@ pub(super) async fn run_circulating_supply_computation(
 
 async fn check_and_collect_daily_circulating_supply(
     view_client: &Addr<near_client::ViewClientActor>,
-    pool: &Database<PgConnection>,
+    pool: &explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
     request_datetime: &Duration,
-) -> anyhow::Result<Option<CirculatingSupply>> {
-    let start_of_day = request_datetime.as_nanos()
-        - request_datetime.as_nanos() % circulating_supply::DAY.as_nanos();
+) -> anyhow::Result<Option<models::aggregated::circulating_supply::CirculatingSupply>> {
+    let start_of_day =
+        request_datetime.as_nanos() - request_datetime.as_nanos() % crate::DAY.as_nanos();
     let printable_date = NaiveDateTime::from_timestamp(request_datetime.as_secs() as i64, 0).date();
-    let block = blocks::get_latest_block_before_timestamp(pool, start_of_day as u64).await?;
+    let block =
+        adapters::blocks::get_latest_block_before_timestamp(pool, start_of_day as u64).await?;
     let block_timestamp = block
         .block_timestamp
         .to_u64()
         .context("`block_timestamp` expected to be u64")?;
 
-    match get_precomputed_circulating_supply_for_timestamp(pool, block_timestamp).await {
+    match adapters::aggregated::circulating_supply::get_precomputed_circulating_supply_for_timestamp(
+        pool,
+        block_timestamp,
+    )
+    .await
+    {
         Ok(None) => {
             info!(
                 target: crate::AGGREGATED,
@@ -111,7 +108,7 @@ async fn check_and_collect_daily_circulating_supply(
                 block_timestamp
             );
             let supply = compute_circulating_supply_for_block(pool, view_client, &block).await?;
-            add_circulating_supply(pool, &supply).await;
+            adapters::aggregated::circulating_supply::add_circulating_supply(pool, &supply).await;
             info!(
                 target: crate::AGGREGATED,
                 "Circulating supply for {} (timestamp {}) is {}",
@@ -136,10 +133,10 @@ async fn check_and_collect_daily_circulating_supply(
 }
 
 async fn compute_circulating_supply_for_block(
-    pool: &Database<PgConnection>,
+    pool: &explorer_database::actix_diesel::Database<explorer_database::diesel::PgConnection>,
     view_client: &Addr<near_client::ViewClientActor>,
     block: &models::Block,
-) -> anyhow::Result<CirculatingSupply> {
+) -> anyhow::Result<models::aggregated::circulating_supply::CirculatingSupply> {
     let block_timestamp = block
         .block_timestamp
         .to_u64()
@@ -155,7 +152,7 @@ async fn compute_circulating_supply_for_block(
         .context("`total_supply` expected to be u128")?;
 
     let lockup_account_ids =
-        accounts::get_lockup_account_ids_at_block_height(pool, &block_height).await?;
+        adapters::accounts::get_lockup_account_ids_at_block_height(pool, &block_height).await?;
 
     let mut lockups_locked_tokens: u128 = 0;
     let mut unfinished_lockup_contracts_count: i32 = 0;
@@ -198,7 +195,7 @@ async fn compute_circulating_supply_for_block(
 
     let circulating_supply: u128 = total_supply - foundation_locked_tokens - lockups_locked_tokens;
 
-    Ok(CirculatingSupply {
+    Ok(models::aggregated::circulating_supply::CirculatingSupply {
         computed_at_block_timestamp: BigDecimal::from(block_timestamp),
         computed_at_block_hash: (&block.block_hash).to_string(),
         circulating_tokens_supply: BigDecimal::from_str(&circulating_supply.to_string())
@@ -228,7 +225,7 @@ async fn wait_for_loading_needed_blocks(
                         target: crate::AGGREGATED,
                         "Blocks are not loaded to calculate circulating supply for {}. Wait for {} hours",
                         NaiveDateTime::from_timestamp(day_to_compute.as_secs() as i64, 0).date(),
-                        circulating_supply::RETRY_DURATION.as_secs() / 60 / 60,
+                        crate::RETRY_DURATION.as_secs() / 60 / 60,
                     );
             }
             Err(err) => {
@@ -236,11 +233,11 @@ async fn wait_for_loading_needed_blocks(
                     target: crate::AGGREGATED,
                     "Failed to get latest block timestamp: {}. Retry in {} hours",
                     err,
-                    circulating_supply::RETRY_DURATION.as_secs() / 60 / 60,
+                    crate::RETRY_DURATION.as_secs() / 60 / 60,
                 );
             }
         }
-        tokio::time::sleep(circulating_supply::RETRY_DURATION).await;
+        tokio::time::sleep(crate::RETRY_DURATION).await;
     }
 }
 
