@@ -21,7 +21,8 @@ const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
 
 const AGGREGATED: &str = "aggregated";
 
-fn main() {
+#[actix::main]
+async fn main() {
     dotenv::dotenv().ok();
 
     let pool = models::establish_connection(
@@ -31,7 +32,7 @@ fn main() {
 
     let rpc_client = JsonRpcClient::connect("https://rpc.mainnet.near.org");
 
-    actix::spawn(run_circulating_supply_computation(rpc_client, pool));
+    run_circulating_supply_computation(rpc_client, pool).await;
 }
 
 // Compute circulating supply on a daily basis, starting from 13 Oct 2020
