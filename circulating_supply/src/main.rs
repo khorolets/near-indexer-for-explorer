@@ -10,7 +10,10 @@ use chrono::NaiveDateTime;
 use diesel::PgConnection;
 use tracing::{error, info, warn};
 
+use actix_diesel::Database;
+use diesel::PgConnection;
 use near_indexer::near_primitives;
+use near_indexer::Indexer;
 
 use crate::aggregated::{account_details, circulating_supply};
 use crate::db_adapters::accounts;
@@ -21,11 +24,22 @@ use crate::db_adapters::blocks;
 use crate::models;
 use crate::models::aggregated::circulating_supply::CirculatingSupply;
 
+mod account_details;
 mod lockup;
 mod lockup_types;
 
 const DAY: Duration = Duration::from_secs(60 * 60 * 24);
 const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
+
+fn main(pool: Database<PgConnection>, indexer: &Indexer) {
+    let view_client = indexer.client_actors().0;
+    if indexer.near_config().genesis.config.chain_id == "mainnet" {
+        actix::spawn(circulating_supply::run_circulating_supply_computation(
+            view_client,
+            pool,
+        ));
+    }
+}
 
 // Compute circulating supply on a daily basis, starting from 13 Oct 2020
 // (Transfers enabled moment on the Mainnet), and put it to the Indexer DB.
