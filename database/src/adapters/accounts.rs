@@ -202,7 +202,7 @@ pub async fn handle_accounts(
     Ok(())
 }
 
-pub(crate) async fn get_lockup_account_ids_at_block_height(
+pub async fn get_lockup_account_ids_at_block_height(
     pool: &actix_diesel::Database<PgConnection>,
     block_height: &near_primitives::types::BlockHeight,
 ) -> anyhow::Result<Vec<near_primitives::types::AccountId>> {

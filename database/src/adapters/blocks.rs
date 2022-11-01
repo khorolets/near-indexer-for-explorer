@@ -39,7 +39,7 @@ pub async fn latest_block_height(
         .and_then(|(block_height,)| block_height.to_u64()))
 }
 
-pub(crate) async fn get_latest_block_before_timestamp(
+pub async fn get_latest_block_before_timestamp(
     pool: &actix_diesel::Database<PgConnection>,
     timestamp: u64,
 ) -> anyhow::Result<models::Block> {

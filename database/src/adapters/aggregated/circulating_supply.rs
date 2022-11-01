@@ -6,7 +6,7 @@ use tracing::error;
 use crate::models::aggregated::circulating_supply::CirculatingSupply;
 use crate::schema;
 
-pub(crate) async fn add_circulating_supply(
+pub async fn add_circulating_supply(
     pool: &actix_diesel::Database<PgConnection>,
     stats: &CirculatingSupply,
 ) {
@@ -37,7 +37,7 @@ pub(crate) async fn add_circulating_supply(
     }
 }
 
-pub(crate) async fn get_precomputed_circulating_supply_for_timestamp(
+pub async fn get_precomputed_circulating_supply_for_timestamp(
     pool: &actix_diesel::Database<PgConnection>,
     timestamp: u64,
 ) -> anyhow::Result<Option<u128>> {

@@ -1,1 +1,1 @@
-pub(crate) mod circulating_supply;
+pub mod circulating_supply;
