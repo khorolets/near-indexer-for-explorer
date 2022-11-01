@@ -19,7 +19,7 @@ mod lockup_types;
 const DAY: Duration = Duration::from_secs(60 * 60 * 24);
 const RETRY_DURATION: Duration = Duration::from_secs(60 * 60 * 2);
 
-const AGGREGATED: &str = "aggregated";
+const CIRCULATING_SUPPLY: &str = "circulating_supply";
 
 #[actix::main]
 async fn main() {
@@ -70,7 +70,7 @@ pub async fn run_circulating_supply_computation(
             }
             Err(err) => {
                 error!(
-                    target: crate::AGGREGATED,
+                    target: crate::CIRCULATING_SUPPLY,
                     "Failed to compute circulating supply for {}: {}. Retry in {} hours",
                     NaiveDateTime::from_timestamp(day_to_compute.as_secs() as i64, 0).date(),
                     err,
@@ -105,7 +105,7 @@ async fn check_and_collect_daily_circulating_supply(
     {
         Ok(None) => {
             info!(
-                target: crate::AGGREGATED,
+                target: crate::CIRCULATING_SUPPLY,
                 "Computing circulating supply for {} (timestamp {})",
                 printable_date,
                 block_timestamp
@@ -113,7 +113,7 @@ async fn check_and_collect_daily_circulating_supply(
             let supply = compute_circulating_supply_for_block(pool, rpc_client, &block).await?;
             adapters::aggregated::circulating_supply::add_circulating_supply(pool, &supply).await;
             info!(
-                target: crate::AGGREGATED,
+                target: crate::CIRCULATING_SUPPLY,
                 "Circulating supply for {} (timestamp {}) is {}",
                 printable_date,
                 block_timestamp,
@@ -123,7 +123,7 @@ async fn check_and_collect_daily_circulating_supply(
         }
         Ok(Some(supply)) => {
             info!(
-                target: crate::AGGREGATED,
+                target: crate::CIRCULATING_SUPPLY,
                 "Circulating supply for {} (timestamp {}) was already computed: {}",
                 printable_date,
                 block_timestamp,
@@ -221,7 +221,7 @@ async fn wait_for_loading_needed_blocks(rpc_client: &JsonRpcClient, day_to_compu
                     return;
                 }
                 warn!(
-                        target: crate::AGGREGATED,
+                        target: crate::CIRCULATING_SUPPLY,
                         "Blocks are not loaded to calculate circulating supply for {}. Wait for {} hours",
                         NaiveDateTime::from_timestamp(day_to_compute.as_secs() as i64, 0).date(),
                         crate::RETRY_DURATION.as_secs() / 60 / 60,
@@ -229,7 +229,7 @@ async fn wait_for_loading_needed_blocks(rpc_client: &JsonRpcClient, day_to_compu
             }
             Err(err) => {
                 error!(
-                    target: crate::AGGREGATED,
+                    target: crate::CIRCULATING_SUPPLY,
                     "Failed to get latest block timestamp: {}. Retry in {} hours",
                     err,
                     crate::RETRY_DURATION.as_secs() / 60 / 60,
