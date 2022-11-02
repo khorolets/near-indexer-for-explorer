@@ -25,6 +25,10 @@ const CIRCULATING_SUPPLY: &str = "circulating_supply";
 async fn main() {
     dotenv::dotenv().ok();
 
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     let pool = models::establish_connection(
         &std::env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set in either .env or environment "),
