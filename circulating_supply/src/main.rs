@@ -38,6 +38,8 @@ async fn main() {
         std::env::var("RPC_URL").expect("RPC_URL must be set in either .env or environment"),
     );
 
+    info!(target: crate::CIRCULATING_SUPPLY, "Starting calculations");
+
     run_circulating_supply_computation(rpc_client, pool).await;
 }
 
@@ -64,6 +66,11 @@ pub async fn run_circulating_supply_computation(
             .expect("Time went backwards");
 
         if now < day_to_compute {
+            info!(
+                target: crate::CIRCULATING_SUPPLY,
+                "Waiting until {} to resume calculations",
+                NaiveDateTime::from_timestamp(day_to_compute.as_secs() as i64, 0)
+            );
             tokio::time::sleep_until(tokio::time::Instant::now().add(day_to_compute.sub(now)))
                 .await;
         }
