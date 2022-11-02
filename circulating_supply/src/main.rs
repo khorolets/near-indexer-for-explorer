@@ -30,7 +30,9 @@ async fn main() {
             .expect("DATABASE_URL must be set in either .env or environment "),
     );
 
-    let rpc_client = JsonRpcClient::connect("https://rpc.mainnet.near.org");
+    let rpc_client = JsonRpcClient::connect(
+        std::env::var("RPC_URL").expect("RPC_URL must be set in either .env or environment"),
+    );
 
     run_circulating_supply_computation(rpc_client, pool).await;
 }
