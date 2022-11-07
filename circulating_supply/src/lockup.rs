@@ -13,7 +13,7 @@ use super::lockup_types::{
 
 // The timestamp (nanos) when transfers were enabled in the Mainnet after community voting
 // Tuesday, 13 October 2020 18:38:58.293
-pub(super) const TRANSFERS_ENABLED: Duration = Duration::from_nanos(1602614338293769340);
+pub(super) const TRANSFERS_ENABLED: Duration = Duration::from_nanos(1667087999437242269);
 
 pub(super) async fn get_lockup_contract_state(
     rpc_client: &JsonRpcClient,

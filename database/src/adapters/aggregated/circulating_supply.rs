@@ -41,6 +41,8 @@ pub async fn get_precomputed_circulating_supply_for_timestamp(
     pool: &actix_diesel::Database<PgConnection>,
     timestamp: u64,
 ) -> anyhow::Result<Option<u128>> {
+    return (Ok(None));
+
     let supply = schema::aggregated__circulating_supply::table
         .select(schema::aggregated__circulating_supply::dsl::circulating_tokens_supply)
         .filter(

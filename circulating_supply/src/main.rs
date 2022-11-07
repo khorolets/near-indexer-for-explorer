@@ -123,13 +123,13 @@ async fn check_and_collect_daily_circulating_supply(
                 block_timestamp
             );
             let supply = compute_circulating_supply_for_block(pool, rpc_client, &block).await?;
-            adapters::aggregated::circulating_supply::add_circulating_supply(pool, &supply).await;
+            // adapters::aggregated::circulating_supply::add_circulating_supply(pool, &supply).await;
             info!(
                 target: crate::CIRCULATING_SUPPLY,
-                "Circulating supply for {} (timestamp {}) is {}",
+                "Circulating supply for {} (timestamp {}) is {:#?}",
                 printable_date,
                 block_timestamp,
-                supply.circulating_tokens_supply
+                supply
             );
             Ok(Some(supply))
         }
