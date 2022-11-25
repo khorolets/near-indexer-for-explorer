@@ -11,6 +11,7 @@ use explorer_database::{adapters, models, receipts_cache};
 use crate::configs::Opts;
 
 mod configs;
+mod metrics;
 
 // Categories for logging
 const INDEXER_FOR_EXPLORER: &str = "indexer_for_explorer";
@@ -177,6 +178,8 @@ async fn main() -> anyhow::Result<()> {
 
         while let Some(_handle_message) = handlers.next().await {}
     });
+
+    metrics::init_server().await?;
 
     match sender.await {
         Ok(Ok(())) => Ok(()),
