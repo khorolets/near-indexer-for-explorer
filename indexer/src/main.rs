@@ -22,6 +22,9 @@ async fn handle_message(
     strict_mode: bool,
     receipts_cache: receipts_cache::ReceiptsCache,
 ) -> anyhow::Result<()> {
+    metrics::BLOCK_COUNT.inc();
+    metrics::BLOCK_HEIGHT.set(streamer_message.block.header.height.try_into().unwrap());
+
     debug!(
         target: INDEXER_FOR_EXPLORER,
         "ReceiptsCache #{} \n {:#?}", streamer_message.block.header.height, &receipts_cache
