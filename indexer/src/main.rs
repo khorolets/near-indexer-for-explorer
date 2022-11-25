@@ -154,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
         std::sync::Arc::new(Mutex::new(SizedCache::with_size(100_000)));
 
     let config: near_lake_framework::LakeConfig = opts.to_lake_config().await;
-    let (sender, stream) = near_lake_framework::streamer(config);
+    let (_, stream) = near_lake_framework::streamer(config);
 
     tokio::spawn(async move {
         tracing::info!(
@@ -181,9 +181,5 @@ async fn main() -> anyhow::Result<()> {
 
     metrics::init_server().await?;
 
-    match sender.await {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(anyhow::Error::from(e)), // JoinError
-    }
+    Ok(())
 }
