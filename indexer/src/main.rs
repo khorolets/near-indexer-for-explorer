@@ -155,29 +155,29 @@ async fn main() -> anyhow::Result<()> {
     let config: near_lake_framework::LakeConfig = opts.to_lake_config().await;
     let (sender, stream) = near_lake_framework::streamer(config);
 
-    tracing::info!(
-        target: INDEXER_FOR_EXPLORER,
-        "Starting Indexer for Explorer (lake)...",
-    );
-    let mut handlers = tokio_stream::wrappers::ReceiverStream::new(stream)
-        .map(|streamer_message| {
-            info!(
-                target: crate::INDEXER_FOR_EXPLORER,
-                "Block height {}", &streamer_message.block.header.height
-            );
-            handle_message(
-                &pool,
-                streamer_message,
-                strict_mode,
-                std::sync::Arc::clone(&receipts_cache),
-            )
-        })
-        .buffer_unordered(1usize);
+    tokio::spawn(async move {
+        tracing::info!(
+            target: INDEXER_FOR_EXPLORER,
+            "Starting Indexer for Explorer (lake)...",
+        );
+        let mut handlers = tokio_stream::wrappers::ReceiverStream::new(stream)
+            .map(|streamer_message| {
+                info!(
+                    target: crate::INDEXER_FOR_EXPLORER,
+                    "Block height {}", &streamer_message.block.header.height
+                );
+                handle_message(
+                    &pool,
+                    streamer_message,
+                    strict_mode,
+                    std::sync::Arc::clone(&receipts_cache),
+                )
+            })
+            .buffer_unordered(1usize);
 
-    while let Some(_handle_message) = handlers.next().await {}
-    drop(handlers); // close the channel so the sender will stop
+        while let Some(_handle_message) = handlers.next().await {}
+    });
 
-    // propagate errors from the sender
     match sender.await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => Err(e),
