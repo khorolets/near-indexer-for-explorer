@@ -46,10 +46,10 @@ async fn get_metrics() -> impl Responder {
 }
 
 pub(crate) async fn init_server() -> Result<(), std::io::Error> {
-    let port: u16 = std::env::var("HTTP_PORT")
+    let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| String::from("3030"))
         .parse()
-        .expect("Unable to parse `HTTP_PORT`");
+        .expect("Unable to parse `PORT`");
 
     info!(
         target: crate::INDEXER_FOR_EXPLORER,
