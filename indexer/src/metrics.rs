@@ -4,9 +4,9 @@ use prometheus::{Encoder, IntCounter, IntGauge, Opts};
 use tracing::info;
 
 lazy_static! {
-    pub(crate) static ref BLOCK_HEIGHT: IntGauge = try_create_int_gauge(
-        "indexer_explorer_lake_block_height",
-        "Last processed block height"
+    pub(crate) static ref LATEST_BLOCK_HEIGHT: IntGauge = try_create_int_gauge(
+        "indexer_explorer_lake_latest_block_height",
+        "Height of last processed block"
     )
     .unwrap();
     pub(crate) static ref BLOCK_COUNT: IntCounter = try_create_int_counter(
