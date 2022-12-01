@@ -25,6 +25,7 @@ r2d2 = "0.8.8"
 tokio = { version = "1.1", features = ["sync", "time"] }
 tokio-stream = { version = "0.1" }
 tracing = "0.1.13"
+tracing-appender = "0.1.2"
 tracing-subscriber = "0.2.4"
 uint = { version = "0.8.3", default-features = false }
 

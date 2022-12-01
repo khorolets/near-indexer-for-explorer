@@ -24,7 +24,10 @@ const CIRCULATING_SUPPLY: &str = "circulating_supply";
 async fn main() {
     dotenv::dotenv().ok();
 
+    let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
+
     let subscriber = tracing_subscriber::fmt()
+        .with_writer(non_blocking)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env());
 
     if std::env::var("ENABLE_JSON_LOGS").is_ok() {

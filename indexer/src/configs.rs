@@ -116,7 +116,9 @@ async fn get_start_block_height(opts: &Opts) -> u64 {
     }
 }
 
-pub(crate) fn init_tracing(debug: bool) -> anyhow::Result<()> {
+pub(crate) fn init_tracing(
+    debug: bool,
+) -> anyhow::Result<tracing_appender::non_blocking::WorkerGuard> {
     let mut env_filter =
         EnvFilter::new("near_lake_framework=info,indexer_for_explorer=info,stats=info");
 
@@ -140,9 +142,11 @@ pub(crate) fn init_tracing(debug: bool) -> anyhow::Result<()> {
         }
     }
 
+    let (non_blocking, guard) = tracing_appender::non_blocking(std::io::stdout());
+
     let subscriber = tracing_subscriber::fmt::Subscriber::builder()
-        .with_env_filter(env_filter)
-        .with_writer(std::io::stderr);
+        .with_writer(non_blocking)
+        .with_env_filter(env_filter);
 
     if std::env::var("ENABLE_JSON_LOGS").is_ok() {
         subscriber.json().init();
@@ -150,7 +154,7 @@ pub(crate) fn init_tracing(debug: bool) -> anyhow::Result<()> {
         subscriber.compact().init();
     }
 
-    Ok(())
+    Ok(guard)
 }
 
 async fn final_block_height(opts: &Opts) -> u64 {

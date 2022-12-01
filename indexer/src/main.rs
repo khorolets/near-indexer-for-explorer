@@ -136,7 +136,7 @@ async fn main() -> anyhow::Result<()> {
 
     let opts: Opts = Opts::parse();
 
-    configs::init_tracing(opts.debug)?;
+    let _worker_guard = configs::init_tracing(opts.debug)?;
 
     // We establish connection as early as possible as an additional sanity check.
     // Indexer should fail if .env file with credentials is missing/wrong
