@@ -45,7 +45,7 @@ async fn get_metrics() -> impl Responder {
     String::from_utf8(buffer.clone()).unwrap()
 }
 
-pub(crate) async fn init_server(port: u16) -> Result<(), std::io::Error> {
+pub(crate) async fn init_server(port: u16) -> anyhow::Result<()> {
     info!(
         target: crate::INDEXER_FOR_EXPLORER,
         "Starting metrics server on http://0.0.0.0:{port}"
@@ -55,4 +55,5 @@ pub(crate) async fn init_server(port: u16) -> Result<(), std::io::Error> {
         .bind(("0.0.0.0", port))?
         .run()
         .await
+        .map_err(|e| anyhow::anyhow!("Error starting metrics server: {}", e))
 }
