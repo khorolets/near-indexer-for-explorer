@@ -182,7 +182,7 @@ async fn main() -> anyhow::Result<()> {
         while let Some(_handle_message) = handlers.next().await {}
     });
 
-    metrics::init_server().await?;
+    metrics::init_server(opts.port).await?;
 
     Ok(())
 }
