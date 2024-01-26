@@ -49,6 +49,8 @@ pub enum ChainId {
     Testnet(StartOptions),
     #[clap(subcommand)]
     Betanet(StartOptions),
+    #[clap(subcommand)]
+    Custom(StartOptions),
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -70,23 +72,31 @@ impl Opts {
         match &self.chain_id {
             ChainId::Mainnet(start_options)
             | ChainId::Testnet(start_options)
-            | ChainId::Betanet(start_options) => start_options,
+            | ChainId::Betanet(start_options)
+            | ChainId::Custom(start_options) => start_options,
         }
     }
 
-    pub fn rpc_url(&self) -> &str {
+    pub fn rpc_url(&self) -> String {
         match self.chain_id {
-            ChainId::Mainnet(_) => "https://rpc.mainnet.near.org",
-            ChainId::Testnet(_) => "https://rpc.testnet.near.org",
-            ChainId::Betanet(_) => "https://rpc.betanet.near.org",
+            ChainId::Mainnet(_) => String::from("https://rpc.mainnet.near.org"),
+            ChainId::Testnet(_) => String::from("https://rpc.testnet.near.org"),
+            ChainId::Betanet(_) => String::from("https://rpc.betanet.near.org"),
+            // For the custom chain, we use RPC_URL env variable (mandatory)
+            ChainId::Custom(_) => {
+                std::env::var("RPC_URL").expect("RPC_URL env variable is not set")
+            }
         }
     }
 
-    pub fn genesis_file_url(&self) -> &str {
+    pub fn genesis_file_url(&self) -> String {
         match self.chain_id {
-            ChainId::Mainnet(_) => "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/mainnet/genesis.json",
-            ChainId::Testnet(_) => "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/genesis.json",
-            ChainId::Betanet(_) => "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/betanet/genesis.json",
+            ChainId::Mainnet(_) => String::from("https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/mainnet/genesis.json"),
+            ChainId::Testnet(_) => String::from("https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/genesis.json"),
+            ChainId::Betanet(_) => String::from("https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/betanet/genesis.json"),
+            // For the custom chain, we use GENESIS_FILE_URL env variable (mandatory)
+            ChainId::Custom(_) => std::env::var("GENESIS_FILE_URL")
+                .expect("GENESIS_FILE_URL env variable is not set"),
         }
     }
 }
@@ -99,6 +109,17 @@ impl Opts {
             ChainId::Mainnet(_) => config_builder.mainnet(),
             ChainId::Testnet(_) => config_builder.testnet(),
             ChainId::Betanet(_) => config_builder.betanet(),
+            ChainId::Custom(_) => config_builder
+                .s3_bucket_name(
+                    std::env::var("S3_BUCKET_NAME")
+                        .expect("S3_BUCKET_NAME env variable is not set")
+                        .as_str(),
+                )
+                .s3_region_name(
+                    std::env::var("S3_REGION_NAME")
+                        .expect("S3_REGION_NAME env variable is not set")
+                        .as_str(),
+                ),
         }
         .start_block_height(get_start_block_height(self).await)
         .build()
