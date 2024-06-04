@@ -111,7 +111,8 @@ impl Opts {
             ChainId::Testnet(_) => config_builder.testnet(),
             ChainId::Betanet(_) => config_builder.betanet(),
             ChainId::Custom(_) => {
-                let s3_conf = aws_sdk_s3::config::Builder::default()
+                let aws_config = aws_config::from_env().load().await;
+                let s3_config = aws_sdk_s3::config::Builder::from(&aws_config)
                     .region(Region::new(
                         std::env::var("S3_REGION_NAME")
                             .expect("S3_REGION_NAME env variable is not set")
@@ -122,9 +123,20 @@ impl Opts {
                             .unwrap_or("https://s3.amazonaws.com".to_string()),
                     )
                     .build();
+                // let s3_conf = aws_sdk_s3::config::Builder::default()
+                //     .region(Region::new(
+                //         std::env::var("S3_REGION_NAME")
+                //             .expect("S3_REGION_NAME env variable is not set")
+                //             .to_string(),
+                //     ))
+                //     .endpoint_url(
+                //         std::env::var("S3_ENDPOINT")
+                //             .unwrap_or("https://s3.amazonaws.com".to_string()),
+                //     )
+                //     .build();
 
                 config_builder
-                    .s3_config(s3_conf)
+                    .s3_config(s3_config)
                     .s3_bucket_name(
                         std::env::var("S3_BUCKET_NAME")
                             .expect("S3_BUCKET_NAME env variable is not set")
