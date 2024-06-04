@@ -1,4 +1,6 @@
+use aws_sdk_s3::Endpoint;
 use clap::{Parser, Subcommand};
+use http::Uri;
 use tracing_subscriber::EnvFilter;
 
 use explorer_database::{adapters, models};
@@ -109,17 +111,31 @@ impl Opts {
             ChainId::Mainnet(_) => config_builder.mainnet(),
             ChainId::Testnet(_) => config_builder.testnet(),
             ChainId::Betanet(_) => config_builder.betanet(),
-            ChainId::Custom(_) => config_builder
-                .s3_bucket_name(
-                    std::env::var("S3_BUCKET_NAME")
-                        .expect("S3_BUCKET_NAME env variable is not set")
-                        .as_str(),
-                )
-                .s3_region_name(
-                    std::env::var("S3_REGION_NAME")
-                        .expect("S3_REGION_NAME env variable is not set")
-                        .as_str(),
-                ),
+            ChainId::Custom(_) => {
+                let aws_config = aws_config::from_env().await;
+                let mut s3_conf = aws_sdk_s3::config::Builder::from(&aws_config);
+                s3_conf
+                    .endpoint_resolver(Endpoint::immutable(
+                        std::env::var("S3_ENDPOINT")
+                            .unwrap_or("https://s3.amazonaws.com".to_string())
+                            .parse::<Uri>()
+                            .unwrap(),
+                    ))
+                    .build();
+
+                config_builder
+                    .s3_config(s3_conf)
+                    .s3_bucket_name(
+                        std::env::var("S3_BUCKET_NAME")
+                            .expect("S3_BUCKET_NAME env variable is not set")
+                            .as_str(),
+                    )
+                    .s3_region_name(
+                        std::env::var("S3_REGION_NAME")
+                            .expect("S3_REGION_NAME env variable is not set")
+                            .as_str(),
+                    )
+            }
         }
         .start_block_height(get_start_block_height(self).await)
         .build()
