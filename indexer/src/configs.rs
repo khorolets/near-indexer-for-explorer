@@ -1,6 +1,4 @@
-use aws_sdk_s3::Endpoint;
 use clap::{Parser, Subcommand};
-use http::Uri;
 use tracing_subscriber::EnvFilter;
 
 use explorer_database::{adapters, models};
@@ -112,15 +110,11 @@ impl Opts {
             ChainId::Testnet(_) => config_builder.testnet(),
             ChainId::Betanet(_) => config_builder.betanet(),
             ChainId::Custom(_) => {
-                let aws_config = aws_config::from_env().await;
-                let mut s3_conf = aws_sdk_s3::config::Builder::from(&aws_config);
-                s3_conf
-                    .endpoint_resolver(Endpoint::immutable(
+                let s3_conf = aws_sdk_s3::config::Builder::default()
+                    .endpoint_url(
                         std::env::var("S3_ENDPOINT")
-                            .unwrap_or("https://s3.amazonaws.com".to_string())
-                            .parse::<Uri>()
-                            .unwrap(),
-                    ))
+                            .unwrap_or("https://s3.amazonaws.com".to_string()),
+                    )
                     .build();
 
                 config_builder
